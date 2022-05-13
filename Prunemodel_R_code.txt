@@ -1,0 +1,111 @@
+library(tidyverse)
+
+
+#Adjustable variables for the model
+
+Prunerate = 6
+pruneadjust = 1
+Mortrate = 0.01
+Runlength = 300
+popsize = 200
+  
+species = c('Ficus','Ligus','Neriu','Phala','Ppine','Plata','Querc','Tilia')
+
+#The species specific variables are in the following order:
+#(CWIDmax, CWIDmean, CWIDsd, Hmax, Hmean, Hsd, GF1, GF2, CWIDfact, CWIDnew, Hnew, GR, CGR)
+#CWID = crown width (m), H = tree height (m), GF = gapfraction, GR = growth rate (m), CGR = crown growth rate (m)
+sp1 = list(c(11,4.7,2,9,4.7,1.6,0.34,0.24,1,1,2,0.3,0.4)
+           ,c(9,2.6,1,6.6,4.1,0.9,0.49,0.37,0.75,1,2,0.3,0.4)
+           ,c(6,2.7,0.9,6,3.5,1,0.61,0.32,0.6,1,2,0.3,0.4)
+           ,c(12,7.4,2,16,11.3,3.2,0.47,0.37,0.9,1,2,0.2,0.4)
+           ,c(12,7.5,1.8,21,12.7,4.7,0.44,0.41,0.8,1,2,0.2,0.4)
+           ,c(13,7.8,2.5,25,17.4,5,0.27,0.27,0.6,1,2,0.4,0.4)
+           ,c(16,7,3.6,23,10.5,4.8,0.39,0.25,0.75,1,2,0.24,0.4)
+           ,c(11.5,7.5,2.1,22,14.3,3.4,0.26,0.23,0.85,1,2,0.13,0.4))
+names(sp1) = species
+
+
+#generate starting population - this only needs to be done once
+trees = data.frame(id=1:popsize, pruneC=1, gapC=1 , dead = FALSE, species=NA,CWID=NA,H=NA,VOL=NA,GF=NA,GF2=NA)
+trees$species <- sample(species, size=popsize, replace =TRUE)
+trees$pruneC <- sample(1:Prunerate, size = popsize, replace=TRUE)
+for (i in species){
+  subtree <- subset(trees, species==i)
+  for (j in 1:length(subtree$id)){
+    subtree$CWID[j] <- rnorm(1, mean=sp1[[i]][2], sd=sp1[[i]][3])
+    subtree$H[j] <- rnorm(1, mean=sp1[[i]][5], sd=sp1[[i]][6])
+    subtree$GF[j] <- sp1[[i]][7]
+    subtree$GF2[j] <- sp1[[i]][8]
+  }
+  trees = rbind(trees, subtree)
+}
+trees = trees[!is.na(trees$GF),]
+trees$VOL = pi*(trees$CWID/2)^2*trees$H*trees$GF
+
+#Save the initiated population and reload for each model run
+save(trees, file = "G:/TREES/trees.rda")
+
+#TREE PRUNING MODEL
+
+load(file = "G:/TREES/trees.rda")#reload before each new model run
+outputspreadsheet <- data.frame(run=1:Runlength)
+output = data.frame(step=1:Runlength,Biomass=NA)
+
+for (i in 1:Runlength){
+  print(i)
+  trees$dead[sample(1:popsize, size=popsize*Mortrate)] <- TRUE
+  tempsub <- trees[FALSE,]
+  for (j in 1:popsize){
+    subz <- subset(trees, id==j)
+    indiv <-  subz$species
+    while(subz$H < sp1[[indiv]][4]){
+      subz$H <- subz$H+sp1[[indiv]][12]#add last years growth making sure doesnt exceed max height
+    }
+    while(subz$CWID < sp1[[indiv]][1]){
+      subz$CWID <- subz$CWID+sp1[[indiv]][13]
+    }
+    if (subz$dead){#checks if dead and replaces with young live tree
+      subz$CWID <- sp1[[indiv]][10]
+      subz$H <- sp1[[indiv]][11]
+      subz$pruneC <- 1
+      
+    }
+    if (subz$pruneC == Prunerate){#checks if ready for pruning, prunes and resets timer
+      if(sp1[[indiv]][9]==1 && pruneadjust > 1){#checks for species where adjustment factor is 1
+        subz$CWID = subz$CWID*(sp1[[indiv]][9])
+      }else{
+        subz$CWID = subz$CWID*(sp1[[indiv]][9]*pruneadjust)
+      }
+      subz$VOL = pi*(subz$CWID/2)^2*subz$H*((1-subz$GF2)*pruneadjust)#uses the freshly pruned gapfraction
+      subz$pruneC <- 1
+    }else{
+      subz$VOL = pi*(subz$CWID/2)^2*subz$H*(1-subz$GF)#uses the normal gapfraction
+      subz$pruneC = subz$pruneC+1
+    }
+    tempsub <- rbind(tempsub, subz)
+    #calculate UTCI
+    if (j==popsize){
+      trees <- tempsub#sends the output back to beginning of loop
+      trees$dead <- FALSE#reset all trees to alive
+      output$Biomass[i] <- sum(tempsub$VOL)
+      parksub <- tempsub[parktrees,]
+      streetsub <- tempsub[streettrees,]
+      output$UTCIstreet[i] <- 40.3 - 0.04*(sum((streetsub$CWID/2)^2*pi)/streetarea)*100
+      output$UTCIpark[i] <- 40.3 - 0.04*(sum((parksub$CWID/2)^2*pi)/parkarea)*100
+    }
+    
+  }
+  
+}
+plot(output$Biomass)
+
+#Can gather statistics from the later runs of the model once some sort of equilibrium has been reached
+mean(output$Biomass[200:300])
+max(output$Biomass[200:300])
+min(output$Biomass[200:300])
+
+
+
+
+
+
