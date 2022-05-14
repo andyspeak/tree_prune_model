@@ -9,12 +9,19 @@ Pruneadjust = a factor that adjusts the pruning severity i.e. 0.8 reduces the pr
 Mortrate = percentage of trees that die each year
 
 The variables for crown width (CWID) and height (H) come from the measured trees in the cities of Taranto and Florence
+
 The gapfactor variables are derived from averaging gapfactors measured using a hemispherical camera lens and the Winscanopy software
+
 GF1 is from Winter1 and thus represents the gapfraction directly after pruning
+
 GF2 is from Winters 2 to 4 and represents the normal gapfraction for the species
+
 CWIDfact is used to reduce the crown width by a species specific value at each pruning event
+
 CWIDnew and Hnew are the crown widths and heights of new replacement trees and are set at 1m and 2m respectively for all species
+
 GR is the tree growth rate. Values are derived from Russo et al. (2014) for Pinus, Quercus, and Tilia genera.  THe other genera values come from discussions with the gardening departments of the two cities and online tree information. THey represent a moderate growth rate of 0.3m for Ficus, Ligustrum and Nerium and a moderate to high growth rate of 0.4m for Platanus.
+
 CGR is the crown growth rate and is set at 0.4m
 
 The crown volume is calculated using the formula
